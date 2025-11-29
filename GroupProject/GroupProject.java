@@ -1,8 +1,9 @@
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
 
+import javax.swing.*;
+import java.awt.*;
 
 class Student {
     String name;
@@ -36,136 +37,220 @@ class Student {
         else if (average >= 60) return "D";
         else return "F";
     }
+
+    @Override
+    public String toString() {
+        return name;
+    }
 }
 
-// Main program
 public class GroupProject {
-    static ArrayList<Student> students = new ArrayList<>();
-    static Scanner scanner = new Scanner(System.in);
+
+    // Data
+    private static final java.util.List<Student> students = new ArrayList<>();
+
+    // Predefined courses for the dropdown
+    private static final String[] COURSES = {
+            "Math", "Science", "English", "History", "Computer Science", "Other..."
+    };
+
+    // GUI components
+    private JFrame frame;
+    private JTextArea outputArea;
 
     public static void main(String[] args) {
-        while (true) {
-            System.out.println("\n=== Student Grade Management System ===");
-            System.out.println("1. Add Student");
-            System.out.println("2. Add Grade");
-            System.out.println("3. Calculate Average");
-            System.out.println("4. Display All Students");
-            System.out.println("5. Exit");
-            System.out.print("Choose an option: ");
+        SwingUtilities.invokeLater(() -> {
+            GroupProject app = new GroupProject();
+            app.createAndShowGUI();
+        });
+    }
 
-            int choice = scanner.nextInt();
-            scanner.nextLine(); 
+    private void createAndShowGUI() {
+        frame = new JFrame("Student Grade Management System");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(700, 500);
+        frame.setLocationRelativeTo(null); // center the window
 
-            switch (choice) {
-                case 1:
-                    addStudent();
-                    break;
-                case 2:
-                    addGrade();
-                    break;
-                case 3:
-                    calculateAverage();
-                    break;
-                case 4:
-                    displayAllStudents();
-                    break;
-                case 5:
-                    System.out.println("Exiting...");
-                    return;
-                default:
-                    System.out.println("Invalid choice. Try again.");
+        frame.setLayout(new BorderLayout());
+
+        // ========= LEFT: BUTTON PANEL =========
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new GridLayout(5, 1, 5, 5));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JButton addStudentBtn = new JButton("Add Student");
+        JButton addGradeBtn = new JButton("Add Grade");
+        JButton calcAverageBtn = new JButton("Calculate Average");
+        JButton displayAllBtn = new JButton("Display All Students");
+        JButton exitBtn = new JButton("Exit");
+
+        buttonPanel.add(addStudentBtn);
+        buttonPanel.add(addGradeBtn);
+        buttonPanel.add(calcAverageBtn);
+        buttonPanel.add(displayAllBtn);
+        buttonPanel.add(exitBtn);
+
+        frame.add(buttonPanel, BorderLayout.WEST);
+
+        // ========= RIGHT: OUTPUT AREA =========
+        outputArea = new JTextArea();
+        outputArea.setEditable(false);
+        outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        JScrollPane scrollPane = new JScrollPane(outputArea);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Output"));
+
+        frame.add(scrollPane, BorderLayout.CENTER);
+
+        // ========= BUTTON ACTIONS =========
+        addStudentBtn.addActionListener(e -> addStudent());
+        addGradeBtn.addActionListener(e -> addGrade());
+        calcAverageBtn.addActionListener(e -> calculateAverage());
+        displayAllBtn.addActionListener(e -> displayAllStudents());
+        exitBtn.addActionListener(e -> frame.dispose());
+
+        frame.setVisible(true);
+    }
+
+    private void addStudent() {
+        String name = JOptionPane.showInputDialog(frame, "Enter student name:");
+        if (name == null || name.trim().isEmpty()) {
+            return;
+        }
+        students.add(new Student(name.trim()));
+        JOptionPane.showMessageDialog(frame, "Student added: " + name);
+        outputArea.append("Added student: " + name + "\n");
+    }
+
+    private void addGrade() {
+        Student student = chooseStudent();
+        if (student == null) return;
+
+        String course = chooseCourse("Select course for grade:");
+        if (course == null || course.trim().isEmpty()) {
+            return;
+        }
+
+        String gradeStr = JOptionPane.showInputDialog(frame, "Enter grade (0-100):");
+        if (gradeStr == null) return;
+
+        try {
+            int grade = Integer.parseInt(gradeStr.trim());
+            if (grade < 0 || grade > 100) {
+                JOptionPane.showMessageDialog(frame, "Grade must be between 0 and 100.");
+                return;
             }
+            student.addGrade(course.trim(), grade);
+            JOptionPane.showMessageDialog(frame,
+                    "Grade added for " + student.name + " in " + course + ": " + grade);
+            outputArea.append("Grade " + grade + " added for " + student.name
+                    + " in " + course + "\n");
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(frame, "Invalid number for grade.");
         }
     }
 
-   
-    static void addStudent() {
-        System.out.print("Enter student name: ");
-        String name = scanner.nextLine();
-        students.add(new Student(name));
-        System.out.println("Student added.");
-    }
+    private void calculateAverage() {
+        Student student = chooseStudent();
+        if (student == null) return;
 
-   
-    static void addGrade() {
-        System.out.print("Enter student name: ");
-        String name = scanner.nextLine();
-
-        Student student = findStudentByName(name);
-        if (student == null) {
-            System.out.println("Student not found.");
+        String course = chooseCourse("Select course to calculate average:");
+        if (course == null || course.trim().isEmpty()) {
             return;
         }
 
-        System.out.print("Enter course name: ");
-        String course = scanner.nextLine();
+        double avg = student.calculateAverage(course.trim());
+        String letter = student.convertToLetterGrade(avg);
 
-        System.out.print("Enter grade: ");
-        int grade = scanner.nextInt();
-        scanner.nextLine();
-
-        student.addGrade(course, grade);
-        System.out.println("Grade added.");
+        String message = String.format(
+                "Average for %s in %s: %.2f (%s)",
+                student.name, course, avg, letter
+        );
+        JOptionPane.showMessageDialog(frame, message);
+        outputArea.append(message + "\n");
     }
 
-    
-    static void calculateAverage() {
-        System.out.print("Enter student name: ");
-        String name = scanner.nextLine();
-
-        Student student = findStudentByName(name);
-        if (student == null) {
-            System.out.println("Student not found.");
-            return;
-        }
-
-        System.out.print("Enter course name: ");
-        String course = scanner.nextLine();
-
-        double average = student.calculateAverage(course);
-        String letter = student.convertToLetterGrade(average);
-
-        System.out.printf("Average for %s in %s: %.2f (%s)%n",
-                name, course, average, letter);
-    }
-
-    
-    static void displayAllStudents() {
+    private void displayAllStudents() {
         if (students.isEmpty()) {
-            System.out.println("No students found.");
+            JOptionPane.showMessageDialog(frame, "No students found.");
             return;
         }
 
-        
-        System.out.println("+----------------------+-----------------+-----------+");
-        System.out.printf("| %-20s | %-15s | %-9s |%n", "Student Name", "Course", "Average");
-        System.out.println("+----------------------+-----------------+-----------+");
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%-20s %-15s %-15s%n", "Student Name", "Course", "Average (Letter)"));
+        sb.append("----------------------------------------------------------------\n");
 
-        
         for (Student s : students) {
             if (s.courses.isEmpty()) {
-                System.out.printf("| %-20s | %-15s | %-9s |%n", s.name, "No courses", "-");
+                sb.append(String.format("%-20s %-15s %-15s%n", s.name, "No courses", "-"));
             } else {
                 for (String course : s.courses.keySet()) {
                     double avg = s.calculateAverage(course);
                     String letter = s.convertToLetterGrade(avg);
-                    System.out.printf("| %-20s | %-15s | %-9s |%n",
-                            s.name, course, String.format("%.2f (%s)", avg, letter));
+                    sb.append(String.format("%-20s %-15s %-15s%n",
+                            s.name, course, String.format("%.2f (%s)", avg, letter)));
                 }
             }
         }
 
-        
-        System.out.println("+----------------------+-----------------+-----------+");
+        outputArea.setText(sb.toString());
     }
 
-   
-    static Student findStudentByName(String name) {
-        for (Student student : students) {
-            if (student.name.equalsIgnoreCase(name)) {
-                return student;
+    // ========= HELPERS =========
+
+    private Student chooseStudent() {
+        if (students.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "No students available. Add a student first.");
+            return null;
+        }
+
+        String[] names = students.stream().map(s -> s.name).toArray(String[]::new);
+
+        String selectedName = (String) JOptionPane.showInputDialog(
+                frame,
+                "Select a student:",
+                "Choose Student",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                names,
+                names[0]
+        );
+
+        if (selectedName == null) {
+            return null;
+        }
+
+        for (Student s : students) {
+            if (s.name.equals(selectedName)) {
+                return s;
             }
         }
         return null;
+    }
+
+    // New: course dropdown with "Other..."
+    private String chooseCourse(String message) {
+        String selectedCourse = (String) JOptionPane.showInputDialog(
+                frame,
+                message,
+                "Choose Course",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                COURSES,
+                COURSES[0]
+        );
+
+        if (selectedCourse == null) {
+            return null; // user cancelled
+        }
+
+        if ("Other...".equals(selectedCourse)) {
+            String customCourse = JOptionPane.showInputDialog(frame, "Enter course name:");
+            if (customCourse == null || customCourse.trim().isEmpty()) {
+                return null;
+            }
+            return customCourse.trim();
+        }
+
+        return selectedCourse;
     }
 }
