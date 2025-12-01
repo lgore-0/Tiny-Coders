@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 
 import javax.swing.*;
 import java.awt.*;
@@ -46,34 +47,183 @@ class Student {
 
 public class GroupProject {
 
-    // Data
-    private static final java.util.List<Student> students = new ArrayList<>();
+    // ===== SHARED DATA (used by both console and GUI) =====
+    private static final ArrayList<Student> students = new ArrayList<>();
+    private static final Scanner scanner = new Scanner(System.in);
 
-    // Predefined courses for the dropdown
+    // Predefined courses for the dropdown (GUI)
     private static final String[] COURSES = {
             "Math", "Science", "English", "History", "Computer Science", "Other..."
     };
 
-    // GUI components
+    // ===== GUI FIELDS =====
     private JFrame frame;
     private JTextArea outputArea;
 
+    // ===== MAIN: choose mode (GUI by default) =====
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            GroupProject app = new GroupProject();
-            app.createAndShowGUI();
-        });
+        // If you run with argument "console", use the text-based menu
+        if (args.length > 0 && args[0].equalsIgnoreCase("console")) {
+            runConsoleMenu();
+        } else {
+            // Otherwise, start the GUI
+            SwingUtilities.invokeLater(() -> {
+                GroupProject app = new GroupProject();
+                app.createAndShowGUI();
+            });
+        }
     }
+
+    // ===================== CONSOLE VERSION =====================
+
+    private static void runConsoleMenu() {
+        while (true) {
+            System.out.println("\n=== Student Grade Management System (Console) ===");
+            System.out.println("1. Add Student");
+            System.out.println("2. Add Grade");
+            System.out.println("3. Calculate Average");
+            System.out.println("4. Display All Students");
+            System.out.println("5. Exit");
+            System.out.print("Choose an option: ");
+
+            int choice;
+            try {
+                choice = scanner.nextInt();
+            } catch (Exception e) {
+                // If invalid input, clear scanner and continue
+                scanner.nextLine();
+                System.out.println("Invalid input. Try again.");
+                continue;
+            }
+            scanner.nextLine(); // consume leftover newline
+
+            switch (choice) {
+                case 1:
+                    addStudentConsole();
+                    break;
+                case 2:
+                    addGradeConsole();
+                    break;
+                case 3:
+                    calculateAverageConsole();
+                    break;
+                case 4:
+                    displayAllStudentsConsole();
+                    break;
+                case 5:
+                    System.out.println("Exiting console mode...");
+                    return;
+                default:
+                    System.out.println("Invalid choice. Try again.");
+            }
+        }
+    }
+
+    private static void addStudentConsole() {
+        System.out.print("Enter student name: ");
+        String name = scanner.nextLine();
+        if (name.trim().isEmpty()) {
+            System.out.println("Name cannot be empty.");
+            return;
+        }
+        students.add(new Student(name.trim()));
+        System.out.println("Student added.");
+    }
+
+    private static void addGradeConsole() {
+        System.out.print("Enter student name: ");
+        String name = scanner.nextLine();
+
+        Student student = findStudentByName(name);
+        if (student == null) {
+            System.out.println("Student not found.");
+            return;
+        }
+
+        System.out.print("Enter course name: ");
+        String course = scanner.nextLine();
+
+        System.out.print("Enter grade: ");
+        int grade;
+        try {
+            grade = scanner.nextInt();
+        } catch (Exception e) {
+            scanner.nextLine();
+            System.out.println("Invalid number for grade.");
+            return;
+        }
+        scanner.nextLine(); // consume newline
+
+        student.addGrade(course.trim(), grade);
+        System.out.println("Grade added.");
+    }
+
+    private static void calculateAverageConsole() {
+        System.out.print("Enter student name: ");
+        String name = scanner.nextLine();
+
+        Student student = findStudentByName(name);
+        if (student == null) {
+            System.out.println("Student not found.");
+            return;
+        }
+
+        System.out.print("Enter course name: ");
+        String course = scanner.nextLine();
+
+        double average = student.calculateAverage(course.trim());
+        String letter = student.convertToLetterGrade(average);
+
+        System.out.printf("Average for %s in %s: %.2f (%s)%n",
+                name, course, average, letter);
+    }
+
+    private static void displayAllStudentsConsole() {
+        if (students.isEmpty()) {
+            System.out.println("No students found.");
+            return;
+        }
+
+        System.out.println("+----------------------+-----------------+-----------+");
+        System.out.printf("| %-20s | %-15s | %-9s |%n", "Student Name", "Course", "Average");
+        System.out.println("+----------------------+-----------------+-----------+");
+
+        for (Student s : students) {
+            if (s.courses.isEmpty()) {
+                System.out.printf("| %-20s | %-15s | %-9s |%n", s.name, "No courses", "-");
+            } else {
+                for (String course : s.courses.keySet()) {
+                    double avg = s.calculateAverage(course);
+                    String letter = s.convertToLetterGrade(avg);
+                    System.out.printf("| %-20s | %-15s | %-9s |%n",
+                            s.name, course, String.format("%.2f (%s)", avg, letter));
+                }
+            }
+        }
+
+        System.out.println("+----------------------+-----------------+-----------+");
+    }
+
+    private static Student findStudentByName(String name) {
+        for (Student student : students) {
+            if (student.name.equalsIgnoreCase(name)) {
+                return student;
+            }
+        }
+        return null;
+    }
+
+    // ===================== GUI VERSION =====================
 
     private void createAndShowGUI() {
         frame = new JFrame("Student Grade Management System");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(700, 500);
-        frame.setLocationRelativeTo(null); // center the window
+        frame.setLocationRelativeTo(null); // center
 
         frame.setLayout(new BorderLayout());
 
-        // ========= LEFT: BUTTON PANEL =========
+        // LEFT: BUTTON PANEL
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(5, 1, 5, 5));
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -92,7 +242,7 @@ public class GroupProject {
 
         frame.add(buttonPanel, BorderLayout.WEST);
 
-        // ========= RIGHT: OUTPUT AREA =========
+        // RIGHT: OUTPUT AREA
         outputArea = new JTextArea();
         outputArea.setEditable(false);
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -101,7 +251,7 @@ public class GroupProject {
 
         frame.add(scrollPane, BorderLayout.CENTER);
 
-        // ========= BUTTON ACTIONS =========
+        // BUTTON ACTIONS
         addStudentBtn.addActionListener(e -> addStudent());
         addGradeBtn.addActionListener(e -> addGrade());
         calcAverageBtn.addActionListener(e -> calculateAverage());
@@ -195,7 +345,7 @@ public class GroupProject {
         outputArea.setText(sb.toString());
     }
 
-    // ========= HELPERS =========
+    // ===== GUI HELPERS =====
 
     private Student chooseStudent() {
         if (students.isEmpty()) {
@@ -227,7 +377,7 @@ public class GroupProject {
         return null;
     }
 
-    // New: course dropdown with "Other..."
+    // Course dropdown with "Other..."
     private String chooseCourse(String message) {
         String selectedCourse = (String) JOptionPane.showInputDialog(
                 frame,
