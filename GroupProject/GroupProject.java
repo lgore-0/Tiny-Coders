@@ -5,6 +5,7 @@ import java.util.Scanner;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.*; // <-- added for saving to file
 
 class Student {
     String name;
@@ -225,19 +226,26 @@ public class GroupProject {
 
         // LEFT: BUTTON PANEL
         JPanel buttonPanel = new JPanel();
-        buttonPanel.setLayout(new GridLayout(5, 1, 5, 5));
+        // now 8 buttons total
+        buttonPanel.setLayout(new GridLayout(8, 1, 5, 5));
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         JButton addStudentBtn = new JButton("Add Student");
         JButton addGradeBtn = new JButton("Add Grade");
         JButton calcAverageBtn = new JButton("Calculate Average");
         JButton displayAllBtn = new JButton("Display All Students");
+        JButton editBtn = new JButton("Edit");
+        JButton deleteBtn = new JButton("Delete");
+        JButton saveBtn = new JButton("Save to File");
         JButton exitBtn = new JButton("Exit");
 
         buttonPanel.add(addStudentBtn);
         buttonPanel.add(addGradeBtn);
         buttonPanel.add(calcAverageBtn);
         buttonPanel.add(displayAllBtn);
+        buttonPanel.add(editBtn);
+        buttonPanel.add(deleteBtn);
+        buttonPanel.add(saveBtn);
         buttonPanel.add(exitBtn);
 
         frame.add(buttonPanel, BorderLayout.WEST);
@@ -256,6 +264,9 @@ public class GroupProject {
         addGradeBtn.addActionListener(e -> addGrade());
         calcAverageBtn.addActionListener(e -> calculateAverage());
         displayAllBtn.addActionListener(e -> displayAllStudents());
+        editBtn.addActionListener(e -> editStudentOrGrade());
+        deleteBtn.addActionListener(e -> deleteStudentOrGrade());
+        saveBtn.addActionListener(e -> saveToFile());
         exitBtn.addActionListener(e -> frame.dispose());
 
         frame.setVisible(true);
@@ -322,6 +333,7 @@ public class GroupProject {
     private void displayAllStudents() {
         if (students.isEmpty()) {
             JOptionPane.showMessageDialog(frame, "No students found.");
+            outputArea.setText("");
             return;
         }
 
@@ -343,6 +355,241 @@ public class GroupProject {
         }
 
         outputArea.setText(sb.toString());
+    }
+
+    // ===== NEW: SAVE / EDIT / DELETE =====
+
+    // Save all students & grades to students.txt
+    private void saveToFile() {
+        if (students.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "No students to save.");
+            return;
+        }
+
+        try (PrintWriter out = new PrintWriter(new FileWriter("students.txt"))) {
+            for (Student s : students) {
+                out.println("Student: " + s.name);
+                if (s.courses.isEmpty()) {
+                    out.println("  No courses/grades.");
+                } else {
+                    for (Map.Entry<String, ArrayList<Integer>> entry : s.courses.entrySet()) {
+                        String course = entry.getKey();
+                        ArrayList<Integer> grades = entry.getValue();
+
+                        out.print("  " + course + ": ");
+                        for (int i = 0; i < grades.size(); i++) {
+                            out.print(grades.get(i));
+                            if (i < grades.size() - 1) {
+                                out.print(", ");
+                            }
+                        }
+                        double avg = s.calculateAverage(course);
+                        String letter = s.convertToLetterGrade(avg);
+                        out.printf(" | Average: %.2f (%s)%n", avg, letter);
+                    }
+                }
+                out.println();
+            }
+            JOptionPane.showMessageDialog(frame, "Students saved to students.txt");
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(frame, "Error saving file: " + ex.getMessage());
+        }
+    }
+
+    // Edit student name or a specific grade
+    private void editStudentOrGrade() {
+        Student student = chooseStudent();
+        if (student == null) return;
+
+        String[] options = {"Rename Student", "Edit Grade", "Cancel"};
+        int choice = JOptionPane.showOptionDialog(
+                frame,
+                "What would you like to edit?",
+                "Edit",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
+        if (choice == 0) { // Rename student
+            String newName = JOptionPane.showInputDialog(frame, "Enter new name:", student.name);
+            if (newName != null && !newName.trim().isEmpty()) {
+                String oldName = student.name;
+                student.name = newName.trim();
+                JOptionPane.showMessageDialog(frame, "Renamed " + oldName + " to " + student.name);
+                outputArea.append("Renamed " + oldName + " to " + student.name + "\n");
+            }
+        } else if (choice == 1) { // Edit grade
+            editGrade(student);
+        }
+        // Cancel -> do nothing
+    }
+
+    private void editGrade(Student student) {
+        if (student.courses.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "This student has no courses/grades.");
+            return;
+        }
+
+        String[] courseNames = student.courses.keySet().toArray(new String[0]);
+        String course = (String) JOptionPane.showInputDialog(
+                frame,
+                "Choose course to edit:",
+                "Edit Grade",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                courseNames,
+                courseNames[0]
+        );
+        if (course == null) return;
+
+        ArrayList<Integer> grades = student.courses.get(course);
+        if (grades == null || grades.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "No grades in this course.");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("Current grades for " + course + ":\n");
+        for (int i = 0; i < grades.size(); i++) {
+            sb.append(i).append(": ").append(grades.get(i)).append("\n");
+        }
+
+        String indexStr = JOptionPane.showInputDialog(
+                frame,
+                sb.toString() + "\nEnter index of grade to edit (0-" + (grades.size() - 1) + "):"
+        );
+        if (indexStr == null) return;
+
+        try {
+            int index = Integer.parseInt(indexStr.trim());
+            if (index < 0 || index >= grades.size()) {
+                JOptionPane.showMessageDialog(frame, "Index out of range.");
+                return;
+            }
+
+            String newGradeStr = JOptionPane.showInputDialog(frame, "Enter new grade (0-100):");
+            if (newGradeStr == null) return;
+
+            int newGrade = Integer.parseInt(newGradeStr.trim());
+            if (newGrade < 0 || newGrade > 100) {
+                JOptionPane.showMessageDialog(frame, "Grade must be between 0 and 100.");
+                return;
+            }
+
+            int oldGrade = grades.get(index);
+            grades.set(index, newGrade);
+            JOptionPane.showMessageDialog(
+                    frame,
+                    "Changed grade " + oldGrade + " to " + newGrade +
+                            " for " + student.name + " in " + course
+            );
+            outputArea.append("Edited grade for " + student.name + " in " + course +
+                    ": " + oldGrade + " -> " + newGrade + "\n");
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(frame, "Invalid number.");
+        }
+    }
+
+    // Delete student, course, or a single grade
+    private void deleteStudentOrGrade() {
+        if (students.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "No students to delete.");
+            return;
+        }
+
+        Student student = chooseStudent();
+        if (student == null) return;
+
+        String[] options = {"Delete Student", "Delete Course", "Delete Grade", "Cancel"};
+        int choice = JOptionPane.showOptionDialog(
+                frame,
+                "What would you like to delete?",
+                "Delete",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+
+        if (choice == 0) { // Delete student
+            students.remove(student);
+            JOptionPane.showMessageDialog(frame, "Deleted student: " + student.name);
+            outputArea.append("Deleted student: " + student.name + "\n");
+        } else if (choice == 1) { // Delete course
+            if (student.courses.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "This student has no courses.");
+                return;
+            }
+            String[] courseNames = student.courses.keySet().toArray(new String[0]);
+            String course = (String) JOptionPane.showInputDialog(
+                    frame,
+                    "Choose course to delete:",
+                    "Delete Course",
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    courseNames,
+                    courseNames[0]
+            );
+            if (course != null) {
+                student.courses.remove(course);
+                JOptionPane.showMessageDialog(frame, "Deleted course " + course +
+                        " for " + student.name);
+                outputArea.append("Deleted course " + course + " for " + student.name + "\n");
+            }
+        } else if (choice == 2) { // Delete grade
+            if (student.courses.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "This student has no courses.");
+                return;
+            }
+
+            String[] courseNames = student.courses.keySet().toArray(new String[0]);
+            String course = (String) JOptionPane.showInputDialog(
+                    frame,
+                    "Choose course:",
+                    "Delete Grade",
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    courseNames,
+                    courseNames[0]
+            );
+            if (course == null) return;
+
+            ArrayList<Integer> grades = student.courses.get(course);
+            if (grades == null || grades.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "No grades in this course.");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder("Current grades for " + course + ":\n");
+            for (int i = 0; i < grades.size(); i++) {
+                sb.append(i).append(": ").append(grades.get(i)).append("\n");
+            }
+
+            String indexStr = JOptionPane.showInputDialog(
+                    frame,
+                    sb.toString() + "\nEnter index of grade to delete (0-" + (grades.size() - 1) + "):"
+            );
+            if (indexStr == null) return;
+
+            try {
+                int index = Integer.parseInt(indexStr.trim());
+                if (index < 0 || index >= grades.size()) {
+                    JOptionPane.showMessageDialog(frame, "Index out of range.");
+                    return;
+                }
+                int removed = grades.remove(index);
+                JOptionPane.showMessageDialog(frame, "Deleted grade " + removed +
+                        " from " + course + " for " + student.name);
+                outputArea.append("Deleted grade " + removed + " from " + course +
+                        " for " + student.name + "\n");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(frame, "Invalid number.");
+            }
+        }
+        // Cancel -> do nothing
     }
 
     // ===== GUI HELPERS =====
